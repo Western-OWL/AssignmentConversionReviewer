@@ -156,7 +156,7 @@ public class App
          *     If found, backtrack to an occurrence of "<" and identify if it matches "<group authzGroup=\""
          *         If so, return true
          *     Otherwise, advance the index and repeat
-         * Return false if our search hits the end (I.e. indexOf "<" returns -1)
+         * Return false if our search hits the end (I.e. indexOf submitterId returns -1)
          */
         int index = 0;
         while (index != -1)
