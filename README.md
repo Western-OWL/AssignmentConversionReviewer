@@ -4,7 +4,7 @@ mvn install:install-file -Dfile=<path to ojdbc6.jar> -DgroupId=com.oracle -Darti
 2) Search the project for "HERE" to locate tokens that will need to be replaced with database credentials, etc.
 
 3) Copy the log output from the conversion job to ./src/main/resources/,
-Then modify App.java line 33, and compile.sh line 2 as appropriate (the converion job's log file's name)
+Then modify App.java line 37, and compile.sh line 2 as appropriate (the converion job's log file's name)
 
 4) Compile using:
 ./compile.sh

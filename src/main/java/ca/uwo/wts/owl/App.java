@@ -9,9 +9,13 @@ import ca.uwo.wts.owl.data.SakaiRealm;
 import ca.uwo.wts.owl.data.SakaiRealmRlGr;
 import ca.uwo.wts.owl.data.SakaiRealmRole;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,57 +34,83 @@ public class App
 {
     public static void main( String[] args )
     {
-        try (Stream<String> stream = Files.lines(Paths.get("assignmentconversion.out")))
+        String filename = "assignmentconversion.out";
+        try (BufferedReader bf = Files.newBufferedReader(Paths.get(filename)))
         {
-            stream.forEach(line ->
+            String line = bf.readLine();
+            String logLine;
+            while (line != null)
             {
-                if (!line.contains("org.sakaiproject.assignment.impl.conversion"))
+                logLine = line;
+                line = bf.readLine();
+                while (line != null && !startsWithADate(line))
+                {
+                    logLine = logLine + "\n" + line;
+                    line = bf.readLine();
+                }
+
+                if (!logLine.contains("org.sakaiproject.assignment.impl.conversion"))
                 {
                     // this isn't output from the job; skip
                 }
-                else if (line.contains("<====="))
+                else if (logLine.contains("<====="))
                 {
                     // all these occurrences are information about the job's configuration / progress / statistics, but not useful for this script; skip
                 }
                 else
                 {
-                    if (line.contains("reintegration of submission"))
+                    if (logLine.contains("reintegration of submission"))
                     {
                         // let's find out if we care!
-                        String submissionId = line.substring(169, 205);
-                        String assignmentId = line.substring(220, 256);
+                        String submissionId = logLine.substring(169, 205);
+                        String assignmentId = logLine.substring(220, 256);
                         try
                         {
                             if (!isSubmissionInteresting(submissionId, assignmentId))
                             {
-                                // boring... next line! (doesn't require investigation)
-                                return;
+                                // boring... next logLine! (doesn't require investigation)
+                                continue;
                             }
                         }
                         catch (RuntimeException e)
                         {
-                            System.out.println("Uncertain how to proceed. " + e.getMessage() + " The line:");
+                            System.out.println("Uncertain how to proceed. " + e.getMessage() + " The log line:");
                         }
                     }
-                    else if (line.contains("xml is invalid skipping assignment"))
+                    else if (logLine.contains("xml is invalid skipping assignment"))
                     {
-                        String assignmentId = line.substring(196, 232);
+                        String assignmentId = logLine.substring(196, 232);
                         // Does it have an associated assignmentContent?
                         if (!assignmentContentExistsForAssignment(assignmentId))
                         {
                             // The assignment has no associated assignment content
-                            return;
+                            continue;
                         }
                     }
                     // Line must be investigated
-                    System.out.println(line);
+                    System.out.println(logLine);
                 }
-            });
+
+            }
         }
         catch (IOException e)
         {
             e.printStackTrace();
         }
+    }
+
+    public static boolean startsWithADate(String line)
+    {
+        DateFormat sdf = new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss.SSS");
+        try
+        {
+            sdf.parse(line.substring(0, 24));
+        }
+        catch (ParseException e)
+        {
+            return false;
+        }
+        return true;
     }
 
     /**
