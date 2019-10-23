@@ -20,6 +20,8 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -36,6 +38,9 @@ public class App
 {
     public static Long keyAsnNew = null;
     public static Long keyAsnSubmit = null;
+
+    // If there are a lot of these, it may be concerning. Tally these up for an analysis when the program completes
+    public static Map<String, List<String>> submissionsToGroupsWithoutSubmitters = new HashMap<>();
 
     public static void main( String[] args )
     {
@@ -102,6 +107,8 @@ public class App
         {
             e.printStackTrace();
         }
+
+        System.out.println("Analysis complete!\nSubmissions assigned to groups without submitters: " + submissionsToGroupsWithoutSubmitters.size() + "\nHere they are:\n" + submissionsToGroupsWithoutSubmitters);
     }
 
     public static boolean startsWithADate(String line)
@@ -152,6 +159,7 @@ public class App
                     if (!groupRealmContainsUsersWithSubmitPermission(submitterId))
                     {
                         // Group doesn't contain users who can submit; not interesting
+                        recordSubmissionWithGroupWithoutSubmitters(submissionId, submitterId);
                         return false;
                     }
 
@@ -314,5 +322,17 @@ public class App
 
         asnSubmitRoles.removeIf(r -> asnNewRoles.contains(r));
         return asnSubmitRoles;
+    }
+
+    public static void recordSubmissionWithGroupWithoutSubmitters(String submissionId, String groupId)
+    {
+        List<String> groups = submissionsToGroupsWithoutSubmitters.get(submissionId);
+        if (groups == null)
+        {
+            groups = new ArrayList<>();
+            submissionsToGroupsWithoutSubmitters.put(submissionId, groups);
+        }
+
+        groups.add(groupId);
     }
 }
