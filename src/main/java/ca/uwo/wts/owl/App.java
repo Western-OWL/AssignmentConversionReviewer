@@ -6,7 +6,9 @@ import ca.uwo.wts.owl.data.AssignmentSubmission;
 import ca.uwo.wts.owl.data.SakaiSiteGroup;
 import ca.uwo.wts.owl.data.SakaiUserIdMap;
 import ca.uwo.wts.owl.data.SakaiRealm;
+import ca.uwo.wts.owl.data.SakaiRealmFunction;
 import ca.uwo.wts.owl.data.SakaiRealmRlGr;
+import ca.uwo.wts.owl.data.SakaiRealmRlFn;
 import ca.uwo.wts.owl.data.SakaiRealmRole;
 
 import java.io.BufferedReader;
@@ -32,6 +34,9 @@ import org.apache.cayenne.query.ObjectSelect;
  */
 public class App 
 {
+    public static Long keyAsnNew = null;
+    public static Long keyAsnSubmit = null;
+
     public static void main( String[] args )
     {
         String filename = "assignmentconversion.out";
@@ -142,20 +147,20 @@ public class App
                         return false;
                     }
 
-                    // submitterId is a group, and it's in the assignment's assigned groups. Does the group's realm contain students (/guests)?
+                    // submitterId is a group, and it's in the assignment's assigned groups. Does the group's realm contain users with submit permission?
                     // note - throws an exception if there are multiple group realms matching this submitterId; handled in the caller
-                    if (!groupRealmContainsStudents(submitterId))
+                    if (!groupRealmContainsUsersWithSubmitPermission(submitterId))
                     {
-                        // Group doesn't contain students; not interesting
+                        // Group doesn't contain users who can submit; not interesting
                         return false;
                     }
 
-                    // It's a group assignment assigned to a group that exists with students... yet reintegration failed. How interesting!
+                    // It's a group assignment assigned to a group that exists with users who can submit... yet reintegration failed. How interesting!
                     return true;
                 }
                 else
                 {
-                    // The submitter is neither a student, nor a group. Something must have been deleted. Skip
+                    // The submitter is neither a user, nor a group. Something must have been deleted. Skip
                     return false;
                 }
             }
@@ -220,16 +225,16 @@ public class App
     }
 
     /**
-     * Queries the group, grabs the Student / Guest roles, and tries to find matching realm-role mappings. 
+     * Queries the group, grabs the roles who can submit, and tries to find matching realm-role mappings.
      * If multiple groups match this ID, a RuntimeException is thrown (this shouldn't happen, but I'm just not 100% certain)
      */
-    public static boolean groupRealmContainsStudents(String groupId)
+    public static boolean groupRealmContainsUsersWithSubmitPermission(String groupId)
     {
         ObjectSelect<SakaiRealm> realmQuery = ObjectSelect.query(SakaiRealm.class).where(SakaiRealm.REALM_ID.like("%/" + groupId));
         List<SakaiRealm> realms = realmQuery.select(ObjectContextProvider.getReadContext());
         if (realms.isEmpty())
         {
-            // No group realm, therefore no students
+            // No group realm, therefore no users with submit permission
             return false;
         }
         if (realms.size() > 1)
@@ -240,29 +245,20 @@ public class App
 
         SakaiRealm realm = realms.get(0);
 
-        List<String> roleNames = new ArrayList<>();
-        roleNames.add("Student");
-        roleNames.add("Guest");
-        List<SakaiRealmRole> roles = getRoles(roleNames);
+        // Get roles that can submit to assignments
+        List<Long> roleKeys = getRoleKeysWithSubmitInRealm(realm);
 
-        // Return true if there are any realm role mappings that map the group's realm to a student/guest role
-        return !getRoleMappingsForRealmWithRoles(realm, roles).isEmpty();
+        // Return true if there are any role mappings that map users in the group's realm to a role that can submit
+        return !getRoleMappingsForRealmWithRoles(realm, roleKeys).isEmpty();
     }
 
-    public static List<SakaiRealmRole> getRoles(List<String> roleNames)
-    {
-        ObjectSelect<SakaiRealmRole> roleQuery = ObjectSelect.query(SakaiRealmRole.class).where(SakaiRealmRole.ROLE_NAME.in(roleNames));
-        return roleQuery.select(ObjectContextProvider.getReadContext());
-    }
-
-    public static List<SakaiRealmRlGr> getRoleMappingsForRealmWithRoles(SakaiRealm realm, List<SakaiRealmRole> roles)
+    public static List<SakaiRealmRlGr> getRoleMappingsForRealmWithRoles(SakaiRealm realm, List<Long> roleKeys)
     {
         // Query: select * from sakai_realm_rl_gr where realm_key = <realm key> and role_key in (<list of role keys>);
         Long realmKey = realm.getRealmKey();
         ObjectSelect<SakaiRealmRlGr> realmRlGrQuery = ObjectSelect.query(SakaiRealmRlGr.class)
             .where(SakaiRealmRlGr.REALM_KEY.eq(realm.getRealmKey()))
-            .and(SakaiRealmRlGr.ROLE_KEY.in(
-                roles.stream().map(SakaiRealmRole::getRoleKey).collect(Collectors.toList())));
+            .and(SakaiRealmRlGr.ROLE_KEY.in(roleKeys));
         return realmRlGrQuery.select(ObjectContextProvider.getReadContext());
     }
 
@@ -290,5 +286,33 @@ public class App
 
         ObjectSelect<AssignmentContent> contentQuery = ObjectSelect.query(AssignmentContent.class).where(AssignmentContent.CONTENT_ID.eq(contentId));
         return contentQuery.selectFirst(ObjectContextProvider.getReadContext()) != null;
+    }
+
+    /**
+     * Gets a function key (numeric pk) associated with a function name (such as 'asn.submit')
+     */
+    public static Long getFunctionKeyForFunctionName(String functionName)
+    {
+        ObjectSelect<SakaiRealmFunction> functionQuery = ObjectSelect.query(SakaiRealmFunction.class).where(SakaiRealmFunction.FUNCTION_NAME.eq(functionName));
+        return functionQuery.selectFirst(ObjectContextProvider.getReadContext()).getFunctionKey();
+    }
+
+    /**
+     * For the given realm, gets the keys for roles that have permission to submit to an assignment. That is, any roles in the realm that are granted asn.submit, but not asn.new
+     */
+    public static List<Long> getRoleKeysWithSubmitInRealm(SakaiRealm realm)
+    {
+        // Get the SakaiRealmFunctions where functionName is asn.submit, and asn.new
+        keyAsnNew = keyAsnNew == null ? getFunctionKeyForFunctionName("asn.new") : keyAsnNew;
+        keyAsnSubmit = keyAsnSubmit == null ? getFunctionKeyForFunctionName("asn.submit") : keyAsnSubmit;
+
+        // Get roles in the realm with asn.submit minus the roles with asn.new
+        ObjectSelect<SakaiRealmRlFn> rolesWithAsnSubmitQuery = ObjectSelect.query(SakaiRealmRlFn.class).where(SakaiRealmRlFn.REALM_KEY.eq(realm.getRealmKey())).and(SakaiRealmRlFn.FUNCTION_KEY.eq(keyAsnSubmit));
+        ObjectSelect<SakaiRealmRlFn> rolesWithAsnNewQuery = ObjectSelect.query(SakaiRealmRlFn.class).where(SakaiRealmRlFn.REALM_KEY.eq(realm.getRealmKey())).and(SakaiRealmRlFn.FUNCTION_KEY.eq(keyAsnNew));
+        List<Long> asnSubmitRoles = rolesWithAsnSubmitQuery.select(ObjectContextProvider.getReadContext()).stream().map(SakaiRealmRlFn::getRoleKey).collect(Collectors.toList());
+        List<Long> asnNewRoles = rolesWithAsnNewQuery.select(ObjectContextProvider.getReadContext()).stream().map(SakaiRealmRlFn::getRoleKey).collect(Collectors.toList());
+
+        asnSubmitRoles.removeIf(r -> asnNewRoles.contains(r));
+        return asnSubmitRoles;
     }
 }

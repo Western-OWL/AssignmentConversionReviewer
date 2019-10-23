@@ -35,6 +35,15 @@
 		<db-attribute name="REALM_ID" type="VARCHAR" isMandatory="true" length="255"/>
 		<db-attribute name="REALM_KEY" type="INTEGER" isPrimaryKey="true" isMandatory="true"/>
 	</db-entity>
+	<db-entity name="SAKAI_REALM_FUNCTION" schema="SCHEMA_HERE">
+		<db-attribute name="FUNCTION_KEY" type="INTEGER" isPrimaryKey="true" isMandatory="true"/>
+		<db-attribute name="FUNCTION_NAME" type="VARCHAR" isMandatory="true" length="99"/>
+	</db-entity>
+	<db-entity name="SAKAI_REALM_RL_FN" schema="SCHEMA_HERE">
+		<db-attribute name="FUNCTION_KEY" type="INTEGER" isPrimaryKey="true" isMandatory="true"/>
+		<db-attribute name="REALM_KEY" type="INTEGER" isPrimaryKey="true" isMandatory="true"/>
+		<db-attribute name="ROLE_KEY" type="INTEGER" isPrimaryKey="true" isMandatory="true"/>
+	</db-entity>
 	<db-entity name="SAKAI_REALM_RL_GR" schema="SCHEMA_HERE">
 		<db-attribute name="ACTIVE" type="CHAR" length="1"/>
 		<db-attribute name="PROVIDED" type="CHAR" length="1"/>
@@ -107,6 +116,15 @@
 		<obj-attribute name="modifiedon" type="java.time.LocalDateTime" db-attribute-path="MODIFIEDON"/>
 		<obj-attribute name="realmKey" type="java.lang.Long" db-attribute-path="REALM_KEY"/>
 	</obj-entity>
+	<obj-entity name="SakaiRealmFunction" className="ca.uwo.wts.owl.data.SakaiRealmFunction" dbEntityName="SAKAI_REALM_FUNCTION">
+		<obj-attribute name="functionName" type="java.lang.String" db-attribute-path="FUNCTION_NAME"/>
+		<obj-attribute name="functionKey" type="java.lang.Long" db-attribute-path="FUNCTION_KEY"/>
+	</obj-entity>
+	<obj-entity name="SakaiRealmRlFn" className="ca.uwo.wts.owl.data.SakaiRealmRlFn" dbEntityName="SAKAI_REALM_RL_FN">
+		<obj-attribute name="realmKey" type="java.lang.Long" db-attribute-path="REALM_KEY"/>
+		<obj-attribute name="functionKey" type="java.lang.Long" db-attribute-path="FUNCTION_KEY"/>
+		<obj-attribute name="roleKey" type="java.lang.Long" db-attribute-path="ROLE_KEY"/>
+	</obj-entity>
 	<obj-entity name="SakaiRealmRlGr" className="ca.uwo.wts.owl.data.SakaiRealmRlGr" readOnly="true" dbEntityName="SAKAI_REALM_RL_GR">
 		<obj-attribute name="active" type="java.lang.String" db-attribute-path="ACTIVE"/>
 		<obj-attribute name="provided" type="java.lang.String" db-attribute-path="PROVIDED"/>
@@ -155,6 +173,18 @@
 	<db-relationship name="sakaiRealmRole" source="SAKAI_REALM" target="SAKAI_REALM_ROLE">
 		<db-attribute-pair source="MAINTAIN_ROLE" target="ROLE_KEY"/>
 	</db-relationship>
+	<db-relationship name="sakaiRealmRlFns" source="SAKAI_REALM_FUNCTION" target="SAKAI_REALM_RL_FN" toDependentPK="true" toMany="true">
+		<db-attribute-pair source="FUNCTION_KEY" target="FUNCTION_KEY"/>
+	</db-relationship>
+	<db-relationship name="sakaiRealmRole" source="SAKAI_REALM_RL_FN" target="SAKAI_REALM_ROLE">
+		<db-attribute-pair source="ROLE_KEY" target="ROLE_KEY"/>
+	</db-relationship>
+	<db-relationship name="sakaiRealm" source="SAKAI_REALM_RL_FN" target="SAKAI_REALM">
+		<db-attribute-pair source="REALM_KEY" target="REALM_KEY"/>
+	</db-relationship>
+	<db-relationship name="sakaiRealmFunction" source="SAKAI_REALM_RL_FN" target="SAKAI_REALM_FUNCTION">
+		<db-attribute-pair source="FUNCTION_KEY" target="FUNCTION_KEY"/>
+	</db-relationship>
 	<db-relationship name="sakaiRealm" source="SAKAI_REALM_RL_GR" target="SAKAI_REALM">
 		<db-attribute-pair source="REALM_KEY" target="REALM_KEY"/>
 	</db-relationship>
@@ -175,6 +205,10 @@
 	</db-relationship>
 	<obj-relationship name="sakaiRealmRlGrs" source="SakaiRealm" target="SakaiRealmRlGr" deleteRule="Deny" db-relationship-path="sakaiRealmRlGrs"/>
 	<obj-relationship name="sakaiRealmRole" source="SakaiRealm" target="SakaiRealmRole" deleteRule="Nullify" db-relationship-path="sakaiRealmRole"/>
+	<obj-relationship name="sakaiRealmRlFns" source="SakaiRealmFunction" target="SakaiRealmRlFn" deleteRule="Deny" db-relationship-path="sakaiRealmRlFns"/>
+	<obj-relationship name="sakaiRealmRole" source="SakaiRealmRlFn" target="SakaiRealmRole" deleteRule="Nullify" db-relationship-path="sakaiRealmRole"/>
+	<obj-relationship name="sakaiRealm" source="SakaiRealmRlFn" target="SakaiRealm" deleteRule="Nullify" db-relationship-path="sakaiRealm"/>
+	<obj-relationship name="sakaiRealmFunction" source="SakaiRealmRlFn" target="SakaiRealmFunction" deleteRule="Nullify" db-relationship-path="sakaiRealmFunction"/>
 	<obj-relationship name="sakaiRealm" source="SakaiRealmRlGr" target="SakaiRealm" deleteRule="Nullify" db-relationship-path="sakaiRealm"/>
 	<obj-relationship name="sakaiRealmRole" source="SakaiRealmRlGr" target="SakaiRealmRole" deleteRule="Nullify" db-relationship-path="sakaiRealmRole"/>
 	<obj-relationship name="sakaiRealms" source="SakaiRealmRole" target="SakaiRealm" deleteRule="Deny" db-relationship-path="sakaiRealms"/>
@@ -208,6 +242,12 @@
 		</includeTable>
 		<includeTable>
 			<name>assignment_content</name>
+		</includeTable>
+		<includeTable>
+			<name>sakai_realm_rl_fn</name>
+		</includeTable>
+		<includeTable>
+			<name>sakai_realm_function</name>
 		</includeTable>
 		<forceDataMapCatalog>false</forceDataMapCatalog>
 		<forceDataMapSchema>false</forceDataMapSchema>
