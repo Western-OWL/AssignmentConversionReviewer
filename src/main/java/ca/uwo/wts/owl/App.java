@@ -29,6 +29,7 @@ import java.util.stream.Stream;
 
 import org.apache.cayenne.ObjectContext;
 import org.apache.cayenne.query.ObjectSelect;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * This application parses a file containing the tomcat log output from the Assignments conversion job, and outputs lines that require investigation.
@@ -89,11 +90,12 @@ public class App
                     }
                     else if (logLine.contains("xml is invalid skipping assignment"))
                     {
-                        String assignmentId = logLine.substring(196, 232);
+                        String assignmentId = logLine.length() == 268 ? logLine.substring(232, 268) : logLine.substring(196, 232);
+
                         // Does it have an associated assignmentContent?
-                        if (!assignmentContentExistsForAssignment(assignmentId))
+                        if (StringUtils.isBlank(assignmentId) || !assignmentContentExistsForAssignment(assignmentId, logLine))
                         {
-                            // The assignment has no associated assignment content
+                            // Can't identify the assignment, or the assignment has no associated assignment content
                             continue;
                         }
                     }
@@ -118,7 +120,7 @@ public class App
         {
             sdf.parse(line.substring(0, 24));
         }
-        catch (ParseException e)
+        catch (Exception e)
         {
             return false;
         }
@@ -270,9 +272,14 @@ public class App
         return realmRlGrQuery.select(ObjectContextProvider.getReadContext());
     }
 
-    public static boolean assignmentContentExistsForAssignment(String assignmentId)
+    public static boolean assignmentContentExistsForAssignment(String assignmentId, String line)
     {
         AssignmentAssignment assignment = getAssignment(assignmentId);
+        if (assignment == null)
+        {
+            System.out.println("This assignment was logged, but an assignment_assignment row does not exist: \"" + assignmentId + "\"; Line:\n" + line);
+            return false;
+        }
         String xml = assignment.getXml();
 
         // Isolate the contentId from the assignment's XML:

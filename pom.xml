@@ -32,13 +32,18 @@
     </dependency>
     <dependency>
         <groupId>com.oracle</groupId>
-        <artifactId>ojdbc6</artifactId>
-        <version>11.2.0.2</version>
+        <artifactId>ojdbc7</artifactId>
+        <version>12.1.0.1.0</version>
     </dependency>
     <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-jdk14</artifactId>
         <version>1.7.28</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.0</version>
     </dependency>
 
 
